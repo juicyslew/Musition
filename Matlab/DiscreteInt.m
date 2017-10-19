@@ -32,7 +32,7 @@ for i = [1:length(int_sig)]
     Yaw = [ cos(oz) -sin(oz) 0;
                   sin(oz) cos(oz) 0 ;
                   0 0 1 ];
-    R(:,:,i+1) =  Yaw * Pitch * Roll * R(:,:,i);
+    R(:,:,i+1) =  R(:,:,i)*Roll*Pitch*Yaw;
     
     sy = sqrt(R(1,1,i+1) * R(1,1,i+1) + R(2,1,i+1) * R(2,1,i+1));
     

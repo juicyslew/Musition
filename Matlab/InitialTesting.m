@@ -1,10 +1,10 @@
 %%
 clear;
 clf;
-load Square_Test.mat;
+load Square2.mat;
 
 hold on;
-signal = [rotation_rate_yradianss, rotation_rate_xradianss, rotation_rate_zradianss];
+signal = [rotation_rate_xradianss, rotation_rate_yradianss, rotation_rate_zradianss];
 Fs = 50;
 play_Fs = 44100;
 
@@ -29,35 +29,37 @@ yawsig = attitude_yawradians(1:length(timestamp1));
 
 plot(timestamp1, yawsig, 'k-')
 %%
-R = zeros(3,3,length(int_sig));
-R(:,:,1) = [1, 0, 0; 0, 1, 0; 0, 0, 1];
-for i = [1:length(int_sig)]
-    %int_sig(i,1)
-    ox = rollsig(i,1);
-    %int_sig(i,2)
-    oy = pitchsig(i,1);
-    %int_sig(i,3)
-    oz = yawsig(i,1);
-    Roll = [1 0 0 ;
-              0 cos(ox) -sin(ox) ;
-              0 sin(ox) cos(ox) ];
-
-    Pitch = [ cos(oy) 0 sin(oy) ;
-                     0 1 0 ;
-                   -sin(oy) 0 cos(oy) ];
-
-    Yaw = [ cos(oz) -sin(oz) 0;
-                  sin(oz) cos(oz) 0 ;
-                  0 0 1 ];
-    R(:,:,i+1) =  -Yaw * -Pitch * -Roll;
-end
+% R = zeros(3,3,length(int_sig));
+% R(:,:,1) = [1, 0, 0; 0, 1, 0; 0, 0, 1];
+% for i = [1:length(int_sig)]
+%     %int_sig(i,1)
+%     ox = rollsig(i,1);
+%     %int_sig(i,2)
+%     oy = pitchsig(i,1);
+%     %int_sig(i,3)
+%     oz = yawsig(i,1);
+%     Roll = [1 0 0 ;
+%               0 cos(ox) -sin(ox) ;
+%               0 sin(ox) cos(ox) ];
+% 
+%     Pitch = [ cos(oy) 0 sin(oy) ;
+%                      0 1 0 ;
+%                    -sin(oy) 0 cos(oy) ];
+% 
+%     Yaw = [ cos(oz) -sin(oz) 0;
+%                   sin(oz) cos(oz) 0 ;
+%                   0 0 1 ];
+%     R(:,:,i+1) =  -Yaw * -Pitch * -Roll;
+% end
 
 pos = zeros(length(R), 3);
 
 for i = 1:length(R)-1 %-1 is jank, but whatever
-    pos(i,:) = R(:,:,i) * ones(3,1);
+    pos(i,:) = R(:,:,i) * [0;1;0];
 end
+figure();
 comet3(pos(:,1), pos(:,2), pos(:,3));
+daspect([1,1,1]);
 title('Position of Phone')
 xlabel('X-axis')
 ylabel('Y-axis')
