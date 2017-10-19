@@ -1,0 +1,149 @@
+%%
+clear;
+clf;
+load Up_Down.mat;
+
+hold on;
+signal = rotation_rate_xradianss;
+Fs = 50;
+play_Fs = 44100;
+
+n = [-22:21];
+%n0 = zeros(size(n));
+%n0(n==0) = 1;
+wc = pi/4;
+h = wc/pi * sinc(wc/pi*n);
+sigfilt = conv(signal, h, 'same');
+
+timestamp0 = timestampunix - timestampunix(1);
+%plot(timestamp0, sigfilt, 'r-');
+
+[timestamp1, int_sig] = DiscreteInt(timestamp0, sigfilt);
+%plot(timestamp1, int_sig, 'm-');
+
+pitchsig = attitude_pitchradians(1:length(timestamp1));
+rollsig = attitude_rollradians(1:length(timestamp1));
+%yawsig = attitude
+
+
+pitchintsig = InterpSig(pitchsig, Fs, play_Fs);
+rollintsig = InterpSig(rollsig, Fs, play_Fs);
+
+% Pitch Calc
+pitchintsig = 440 .* (2.^(pitchintsig));
+plot(pitchintsig, 'k-');
+
+%Roll Calc
+rollintsig = 1 .* (2.^(rollintsig/2));
+plot(rollintsig, 'r-')
+music = PosToFreq(pitchintsig, rollintsig, play_Fs);
+
+clf;
+plot(music, 'k-')
+
+sound(music, play_Fs)
+
+%[timestamp2, int2_sig] = DiscreteInt(timestamp1, int_sig);
+%plot(timestamp2, int2_sig, 'k-');
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [signal] = PosToFreq(pitch, vol, Fs)
+%POSTOFREQ converts position or orientation signal to auditory signal
+%   Takes the value of the input and converts those values to frequencies.
+    %convertval = Fs/play_Fs;
+    signal = zeros(length(pitch),1);
+    %disp(size(signal))
+    %disp(convertval)
+    %disp(size(in))
+    
+    h_1 = pitch(1); %frequency of first wave
+    hs = zeros(length(pitch), 1); %frequency ratios of first to other waves
+    
+    for j = 1:length(pitch)
+        hs(j) = h_1/pitch(j);
+    end
+    
+    t_1 = 0;
+    for i = 1:length(signal)-1 %-1 because was going out of bounds
+        t_1 = t_1 + (1/Fs) / hs(i);
+        t = t_1 * hs(i);
+        signal(i) = vol(i)*sin(2*pi*pitch(i)*(t)); %sin(2*pi*freq*time);
+    end
+end
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [newtimestamp, int_sig] = DiscreteInt(timestampunix, signal)
+%DISCRETEINT Discrete Integration Function
+%   
+
+unixdiff = ones(size(timestampunix,1)-1,size(timestampunix,2));
+
+for i = [1:length(unixdiff)-1]
+    unixdiff(i) = timestampunix(i+1) - timestampunix(i);
+end
+
+
+int_sig = ones(size(signal,1)-1,size(signal,2));
+%size(unixdiff)
+%size(signal)
+R = [1, 0, 0; 0, 1, 0; 0, 0, 1]
+for i = [1:length(int_sig)]
+    %int_sig(i,1)
+    ox = unixdiff(i) * signal(i,1);
+    %int_sig(i,2)
+    oy = unixdiff(i) * signal(i,2);
+    %int_sig(i,3)
+    oz = unixdiff(i) * signal(i,3);
+    Roll = [1 0 0 ;
+              0 cos(ox) -sin(ox) ;
+              0 sin(ox) cos(ox) ];
+
+    Pitch = [ cos(oy) 0 sin(oy) ;
+                     0 1 0 ;
+                   -sin(oy) 0 cos(oy) ];
+
+    Yaw = [ cos(oz) -sin(oz) 0;
+                  sin(oz) cos(oz) 0 ;
+                  0 0 1 ];
+    R =  Yaw * Pitch * Roll * R;
+    
+    sy = sqrt(R(1,1) * R(1,1) + R(2,1) * R(2,1));
+    
+    singular = sy < 1e-6;
+    
+    if ~singular
+        int_sig(i,1) = atan2(R(3,2), R(3,3));
+        int_sig(i,2) = atan2(-R(3,1), sy);
+        int_sig(i,3) = atan2(R(2,1), R(1,1));
+    else
+        int_sig(i,1) = atan2(-R(2,3), R(2,2));
+        int_sig(i,2) = atan2(-R(3,1), sy);
+        int_sig(i,3) = 0;
+    end
+end
+
+% idx = find(int_rot_y <= -4);
+% int_rot_y = int_rot_y(1:idx(:,1));
+
+newtimestamp = timestampunix(1:length(int_sig));
+
+end
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [intsig] = InterpSig(origsig, Fs, play_Fs)
+%INTERPSIG Summary of this function goes here
+%   Detailed explanation goes here
+    xq = linspace(1, length(origsig), length(origsig) * play_Fs/Fs);
+    intsig= interp1(origsig, xq);
+end
+
