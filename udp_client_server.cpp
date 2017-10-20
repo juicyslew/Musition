@@ -26,6 +26,10 @@
 #include <time.h>
 #include <sstream>
 #include <eigen3/Eigen/Core>
+#include <cmath>
+#include <math.h>
+#include <bitset>
+#include <ctime>
 
 
 namespace udp_client_server
@@ -350,16 +354,36 @@ int main()
     char f[60];
 
     udp_server udp = udp_server("192.168.33.146", 25565);
-    int i = 0;
+    int i = -1; //iterator of data
+    int aveCount = 0; //iterator of averager
+    int aveset = 100; //amount of data for calibration
+
+    float Fs = 10;
+    float play_Fs = 44100;
+    float ratio = play_Fs/Fs; //ratio of audio rate to data rate
+    float x, y, z; //euler angle holders
+    float x_o = 0;
+    float y_o = 0;
+    float z_o = 0;
+    float t_1 = 0;
+    float h_1 = 0; //frequency of first wave
+    int maxvol = 32767;
     std::string delimiter = ";";
-    MatrixXd m(1000,3);
+    //MatrixXd recoder(aveset,3);
+    float recorder[3] = {0, 0, 0};
     MatrixXd R(3,3);
     R << 1,0,0,
       0,1,0,
       0,0,1;
-    while(i<1000){
-      udp.timed_recv(f, 60, 10);
+    std::clock_t start;
+    while(i<10000){
+      start = std::clock();
+      //ratio = play_Fs/Fs;
+      //** Get Data **//
+      udp.recv(f, 60);
       //std::cout<<strf<<"\n";
+
+      //** Parse Data **//
       std::string strf = std::string(f);
       std::istringstream ss(strf);
       std::string token;
@@ -369,50 +393,122 @@ int main()
       while(std::getline(ss, token, ';')) {
           if (token.length()>4){
             //std::cout << token << '\n';
-            sig[col] = atof(token.substr(2).c_str())*.01; //Velocity * time //eventually change this to elapsed time
-            // = atof(token.substr(2).c_str());
+            //sig[col] = 0;//atof(token.substr(2).c_str())*(1/Fs); //Velocity * time //eventually change this to elapsed time
+            sig[col] = atof(token.substr(2).c_str())*(1/Fs);
 
 
             //std::cout << val << '\n';
             col++;
           }
       }
-      MatrixXd Rx(3,3);
-      MatrixXd Ry(3,3);
-      MatrixXd Rz(3,3);
-      Rx << 1,0,0,
-        0,cos(sig[0]),-sin(sig[0]),
-        0,sin(sig[0]),cos(sig[0]); //This might be sig[1]
-      Ry << cos(sig[1]),0,sin(sig[1]),
-        0,1,0,
-        -sin(sig[1]),0,cos(sig[1]); //And this sig[0]
-      Rz << cos(sig[2]),sin(sig[2]),0,
-        -sin(sig[2]),cos(sig[2]),0,
-        0,0,1;
-
-      R = Rz * Ry * Rx * R;
-
-      double sy = sqrt(R(0,0)*R(0,0) + R(1,0) * R(1,0));
-
-      bool singular = (sy < 1e-6);
-
-      if (not singular){
-        m(i, 0) = std::atan2(R(2,1), R(2,2));
-        m(i, 1) = std::atan2(-R(2,0), sy);
-        m(i, 2) = std::atan2(R(1,0), R(0,0));
+      if (i == -1){
+        if(aveCount < aveset){
+          recorder[0] += sig[0];
+          recorder[1] += sig[1];
+          recorder[2] += sig[2];
+          aveCount++;
+          std::cout << aveCount << '\n';
+        }else{
+          recorder[0] = recorder[0]/aveset;
+          recorder[1] = recorder[1]/aveset;
+          recorder[2] = recorder[2]/aveset;
+          i++;
+        }
       }else{
-        m(i, 0) = std::atan2(-R(1,2), R(1,1));
-        m(i, 1) = std::atan2(-R(2,0), sy);
-        m(i, 2) = 0;
+        sig[0] -= recorder[0];
+        sig[1] -= recorder[1];
+        sig[2] -= recorder[2];
+        //** Convert Data to Euler Angles**//
+        MatrixXd Rx(3,3);
+        MatrixXd Ry(3,3);
+        MatrixXd Rz(3,3);
+        Rx << 1,0,0,
+          0,cos(sig[0]),-sin(sig[0]),
+          0,sin(sig[0]),cos(sig[0]); //This might be sig[1]
+        Ry << cos(sig[1]),0,sin(sig[1]),
+          0,1,0,
+          -sin(sig[1]),0,cos(sig[1]); //And this sig[0]
+        Rz << cos(sig[2]),sin(sig[2]),0,
+          -sin(sig[2]),cos(sig[2]),0,
+          0,0,1;
+
+        R = R * Rx * Ry * Rz;
+
+        double sy = sqrt(R(0,0)*R(0,0) + R(1,0) * R(1,0));
+
+        bool singular = (sy < 1e-6);
+
+        if (not singular){
+          x= std::atan2(R(2,1), R(2,2));//m(i, 0) = std::atan2(R(2,1), R(2,2));
+          y= std::atan2(-R(2,0), sy);//m(i, 1) = std::atan2(-R(2,0), sy);
+          z= std::atan2(R(1,0), R(0,0));//m(i, 2) = std::atan2(R(1,0), R(0,0));
+        }else{
+          x= std::atan2(-R(1,2), R(1,1));//m(i, 0) = std::atan2(-R(1,2), R(1,1));
+          y= std::atan2(-R(2,0), sy);//m(i, 1) = std::atan2(-R(2,0), sy);
+          z= 0;//m(i, 2) = 0;
+        }
+
+        //** Interpret and Interpolate Sig **//
+        int k = 0; //iterator of played audio
+        short testsig[int(ceil(ratio))];
+        while (k < ratio){
+          //float xuse = 0;
+          //float yuse = 0;
+          float xuse = std::min(std::max((x-x_o) * k/ratio + x, -float(M_PI)),float(M_PI));
+          float yuse = std::min(std::max((y-y_o) * k/ratio + y, -float(M_PI)),float(M_PI));
+          //float zuse = (z-z_o) * k/ratio;
+
+          float freq = 440;//440 * pow(2, std::abs(xuse));
+          float vol = 10000;//maxvol/M_PI* pow(2, std::abs(yuse));
+          //std::cout << freq << '\n';
+
+          //** Convert to Sine Waves **//
+          if (i == 0){
+            h_1 = freq;
+          }
+          float hn = h_1/freq;
+
+
+          //for i = 1:length(signal)-1 %-1 because was going out of bounds
+          t_1 = t_1 + (1/play_Fs)/hn;
+          float t = t_1 * hn;
+          short finsig = vol*sin(2*M_PI*freq*t); //sin(2*pi*freq*time);
+          //end
+
+          //std::string x = strf.substr(, strf.find(delimiter));
+          //std::cout<<x<<"\n";
+
+          //std::cout<<i<<"\n";
+          /*char plotter[128] = "               ";
+          for (int l = 0; l < 129; l++){
+            if ((finsig+maxvol) >=  float(l*(2*maxvol)/(128))){
+              plotter[l] = '#';
+              std::cout << '#';
+            }
+          }
+          std::cout << '\n';*/
+          //testsig[k] = finsig;
+
+          std::cout.write(reinterpret_cast<const char*>(&finsig), sizeof finsig);
+          //std::bitset<sizeof(short) * CHAR_BIT> bits(finsig);
+          //std::cout << bits << std::endl;
+          //std::cout << k << std::endl;
+          //fprintf( stdout, finsig );
+          //stdout << finsig << "\n";
+          k+=1;
+        }
+        //std::cout << testsig;
+        //for (int j = 0; j < ceil(ratio); j++){
+        //  std::cout << testsig[j] << std::endl;
+        //}
+        x_o = x;
+        y_o = y;
+        z_o = z;
+        i+=1;
       }
-
-
-      //std::string x = strf.substr(, strf.find(delimiter));
-      //std::cout<<x<<"\n";
-      i+=1;
-      std::cout<<i<<"\n";
+      //Fs = 1/(( std::clock() - start ) / (double) CLOCKS_PER_SEC);
     }
-    std::cout << m;
+
 }
 
 // vim: ts=4 sw=4 et
