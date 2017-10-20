@@ -359,7 +359,7 @@ int main()
     int aveset = 100; //amount of data for calibration
 
     float Fs = 10;
-    float play_Fs = 44100;
+    float play_Fs = 22050;
     float ratio = play_Fs/Fs; //ratio of audio rate to data rate
     float x, y, z; //euler angle holders
     float x_o = 0;
@@ -367,7 +367,7 @@ int main()
     float z_o = 0;
     float t_1 = 0;
     float h_1 = 0; //frequency of first wave
-    int maxvol = 32767;
+    int maxvol = 30000;
     std::string delimiter = ";";
     //MatrixXd recoder(aveset,3);
     float recorder[3] = {0, 0, 0};
@@ -394,7 +394,7 @@ int main()
           if (token.length()>4){
             //std::cout << token << '\n';
             //sig[col] = 0;//atof(token.substr(2).c_str())*(1/Fs); //Velocity * time //eventually change this to elapsed time
-            sig[col] = atof(token.substr(2).c_str())*(1/Fs);
+            sig[col] = std::atof(token.substr(2).c_str())*(1/Fs);
 
 
             //std::cout << val << '\n';
@@ -402,7 +402,7 @@ int main()
           }
       }
       if (i == -1){
-        if(aveCount < aveset){
+        /*if(aveCount < aveset){
           recorder[0] += sig[0];
           recorder[1] += sig[1];
           recorder[2] += sig[2];
@@ -411,25 +411,26 @@ int main()
         }else{
           recorder[0] = recorder[0]/aveset;
           recorder[1] = recorder[1]/aveset;
-          recorder[2] = recorder[2]/aveset;
+          recorder[2] = recorder[2]/aveset;*/
           i++;
-        }
+        //}
       }else{
-        sig[0] -= recorder[0];
-        sig[1] -= recorder[1];
-        sig[2] -= recorder[2];
+        //sig[0] += 0.008; //recorder[0]
+        //sig[1] += .00005;//recorder[1]
+        //sig[2] += .0045;//recorder[2]
+        //std::cout << sig[0] << std::endl;
         //** Convert Data to Euler Angles**//
         MatrixXd Rx(3,3);
         MatrixXd Ry(3,3);
         MatrixXd Rz(3,3);
         Rx << 1,0,0,
-          0,cos(sig[0]),-sin(sig[0]),
-          0,sin(sig[0]),cos(sig[0]); //This might be sig[1]
-        Ry << cos(sig[1]),0,sin(sig[1]),
+          0,std::cos(sig[0]),-std::sin(sig[0]),
+          0,std::sin(sig[0]),std::cos(sig[0]); //This might be sig[1]
+        Ry << std::cos(sig[1]),0,std::sin(sig[1]),
           0,1,0,
-          -sin(sig[1]),0,cos(sig[1]); //And this sig[0]
-        Rz << cos(sig[2]),sin(sig[2]),0,
-          -sin(sig[2]),cos(sig[2]),0,
+          -std::sin(sig[1]),0,std::cos(sig[1]); //And this sig[0]
+        Rz << std::cos(sig[2]),-std::sin(sig[2]),0,
+          std::sin(sig[2]),std::cos(sig[2]),0,
           0,0,1;
 
         R = R * Rx * Ry * Rz;
@@ -450,23 +451,23 @@ int main()
 
         //** Interpret and Interpolate Sig **//
         int k = 0; //iterator of played audio
-        short testsig[int(ceil(ratio))];
+        //short testsig[int(ceil(ratio))];
         while (k < ratio){
           //float xuse = 0;
           //float yuse = 0;
           float xuse = std::min(std::max((x-x_o) * k/ratio + x, -float(M_PI)),float(M_PI));
           float yuse = std::min(std::max((y-y_o) * k/ratio + y, -float(M_PI)),float(M_PI));
-          //float zuse = (z-z_o) * k/ratio;
+          float zuse = std::min(std::max((z-z_o) * k/ratio + z, -float(M_PI)),float(M_PI));
 
-          float freq = 440;//440 * pow(2, std::abs(xuse));
-          float vol = 10000;//maxvol/M_PI* pow(2, std::abs(yuse));
+          float freq = 440 * std::pow(2.0, std::abs(xuse)/2);
+          float vol = maxvol/M_PI* std::pow(2.0, std::abs(yuse));
           //std::cout << freq << '\n';
 
           //** Convert to Sine Waves **//
           if (i == 0){
             h_1 = freq;
           }
-          float hn = h_1/freq;
+          double hn = h_1/freq;
 
 
           //for i = 1:length(signal)-1 %-1 because was going out of bounds
@@ -490,6 +491,7 @@ int main()
           //testsig[k] = finsig;
 
           std::cout.write(reinterpret_cast<const char*>(&finsig), sizeof finsig);
+          //std::cout << finsig << std::endl;
           //std::bitset<sizeof(short) * CHAR_BIT> bits(finsig);
           //std::cout << bits << std::endl;
           //std::cout << k << std::endl;
