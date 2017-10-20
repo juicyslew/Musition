@@ -347,7 +347,7 @@ int udp_server::timed_recv(char *msg, size_t max_size, int max_wait_ms)
 
 } // namespace udp_client_server
 
-int main()
+int main() //FOR COMMAND LINE COMMAND GO TO BOTTOM OF PAGE
 {
     using namespace udp_client_server;
     using namespace Eigen;
@@ -415,9 +415,9 @@ int main()
           i++;
         //}
       }else{
-        //sig[0] += 0.008; //recorder[0]
-        //sig[1] += .00005;//recorder[1]
-        //sig[2] += .0045;//recorder[2]
+        sig[0] += 0.007; //recorder[0]
+        sig[1] += .00005;//recorder[1]
+        sig[2] += .004;//recorder[2]
         //std::cout << sig[0] << std::endl;
         //** Convert Data to Euler Angles**//
         MatrixXd Rx(3,3);
@@ -459,8 +459,9 @@ int main()
           float yuse = std::min(std::max((y-y_o) * k/ratio + y, -float(M_PI)),float(M_PI));
           float zuse = std::min(std::max((z-z_o) * k/ratio + z, -float(M_PI)),float(M_PI));
 
-          float freq = 440 * std::pow(2.0, std::abs(xuse)/2);
+          float freq = 440 * std::pow(2.0, std::abs(xuse));
           float vol = maxvol/M_PI* std::pow(2.0, std::abs(yuse));
+          float dutycycle = (zuse+M_PI)/(2*M_PI);
           //std::cout << freq << '\n';
 
           //** Convert to Sine Waves **//
@@ -473,7 +474,14 @@ int main()
           //for i = 1:length(signal)-1 %-1 because was going out of bounds
           t_1 = t_1 + (1/play_Fs)/hn;
           float t = t_1 * hn;
-          short finsig = vol*sin(2*M_PI*freq*t); //sin(2*pi*freq*time);
+          short finsig = vol* sin(2*M_PI*freq*t);
+          /*short finsig;
+          if (std::sin(2*M_PI*freq*t) > 2*dutycycle-1){
+            finsig = vol;
+          }else{
+            finsig = -vol;
+          }*/
+          //sin(2*pi*freq*time);
           //end
 
           //std::string x = strf.substr(, strf.find(delimiter));
@@ -514,3 +522,5 @@ int main()
 }
 
 // vim: ts=4 sw=4 et
+// RUN THIS CODE WITH THE FOLLOWING COMMAND:
+// ./udp_client_server | aplay -f cd -i --disable-softvol -r 36000 -v -c 1
