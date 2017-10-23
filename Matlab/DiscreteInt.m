@@ -1,6 +1,6 @@
 function [newtimestamp, int_sig, R] = DiscreteInt(timestampunix, signal)
 %DISCRETEINT Discrete Integration Function
-%   
+%
 
 unixdiff = ones(size(timestampunix,1)-1,size(timestampunix,2));
 
@@ -33,11 +33,8 @@ for i = [1:length(int_sig)]
                   sin(oz) cos(oz) 0 ;
                   0 0 1 ];
     R(:,:,i+1) =  R(:,:,i)*Roll*Pitch*Yaw;
-    
     sy = sqrt(R(1,1,i+1) * R(1,1,i+1) + R(2,1,i+1) * R(2,1,i+1));
-    
     singular = sy < 1e-6;
-    
     if ~singular
         int_sig(i,1) = atan2(R(3,2,i+1), R(3,3,i+1));
         int_sig(i,2) = atan2(-R(3,1,i+1), sy);
@@ -55,4 +52,3 @@ end
 newtimestamp = timestampunix(1:length(int_sig));
 
 end
-
