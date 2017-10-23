@@ -52,18 +52,17 @@ plot(timestamp1, yawsig, 'k-')
 %     R(:,:,i+1) =  -Yaw * -Pitch * -Roll;
 % end
 
-pos = zeros(length(R), 3);
+pos = zeros(length(R)-100, 3);
 
-for i = 1:length(R)-1 %-1 is jank, but whatever
+for i = 1:length(R)-100 %-1 is jank, but whatever
     pos(i,:) = R(:,:,i) * [0;1;0];
 end
 figure();
-comet3(pos(:,1), pos(:,2), pos(:,3));
+plot3(pos(:,1), pos(:,2), pos(:,3), 'r-');
 daspect([1,1,1]);
-title('Position of Phone')
-xlabel('X-axis')
-ylabel('Y-axis')
-zlabel('Z-axis')
+xlabel('X position')
+ylabel('Y position')
+zlabel('Z position')
 %%
 
 pitchintsig = InterpSig(pitchsig, Fs, play_Fs);
@@ -81,7 +80,7 @@ music = PosToFreq(pitchintsig, rollintsig, play_Fs);
 clf;
 plot(music, 'k-')
 
-%sound(music, play_Fs)
+sound(music, play_Fs)
 
 %[timestamp2, int2_sig] = DiscreteInt(timestamp1, int_sig);
 %plot(timestamp2, int2_sig, 'k-');
